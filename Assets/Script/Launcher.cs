@@ -60,22 +60,27 @@ public class Launcher : MonoBehaviourPunCallbacks
 
     public override void OnJoinedRoom()
     {
-        MenuManager.Instance.OpenMenu("Room");
-        roomNameText.text = PhotonNetwork.CurrentRoom.Name;
-
         Player[] players = PhotonNetwork.PlayerList;
-
-        foreach(Transform child in playerListContent)
+        
+        if(players.Length < 3)
         {
-            Destroy(child.gameObject);
-        }
+            MenuManager.Instance.OpenMenu("Room");
 
-        for(int i = 0; i < players.Length; i++)
-        {
-            Instantiate(playerListItemPrefab, playerListContent).GetComponent<PlayerListItem>().SetUp(players[i]);
-        }
+            roomNameText.text = PhotonNetwork.CurrentRoom.Name;
+        
+            foreach(Transform child in playerListContent)
+            {
+                Destroy(child.gameObject);
+            }
 
-        startGameButton.SetActive(PhotonNetwork.IsMasterClient);
+            for(int i = 0; i < players.Length; i++)
+            {
+                Instantiate(playerListItemPrefab, playerListContent).GetComponent<PlayerListItem>().SetUp(players[i]);
+            }
+
+            startGameButton.SetActive(PhotonNetwork.IsMasterClient);
+        }
+        
     }
 
     public override void OnMasterClientSwitched(Player newMasterClient)

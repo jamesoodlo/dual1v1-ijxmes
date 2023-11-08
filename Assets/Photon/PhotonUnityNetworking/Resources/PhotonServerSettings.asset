@@ -19,7 +19,7 @@ MonoBehaviour:
     AppIdVoice: 
     AppVersion: 
     UseNameServer: 1
-    FixedRegion: 
+    FixedRegion: asia
     Server: 
     Port: 0
     ProxyServer: 
@@ -42,9 +42,11 @@ MonoBehaviour:
   - RPC_AttackAnimation
   - RPC_Health
   - RPC_TakeDamage
+  - RPC_RollAnimation
   - DestroySpaceship
   - Fire
   - RespawnSpaceship
+  - RPC_GetKill
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

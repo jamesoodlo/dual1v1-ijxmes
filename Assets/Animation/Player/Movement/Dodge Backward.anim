@@ -24690,7 +24690,7 @@ AnimationClip:
     m_LoopBlendPositionXZ: 0
     m_KeepOriginalOrientation: 1
     m_KeepOriginalPositionY: 0
-    m_KeepOriginalPositionXZ: 1
+    m_KeepOriginalPositionXZ: 0
     m_HeightFromFeet: 1
     m_Mirror: 0
   m_EditorCurves:
@@ -48438,6 +48438,20 @@ AnimationClip:
   - time: 0.06666667
     functionName: ResetAttack
     data: 
+    objectReferenceParameter: {fileID: 0}
+    floatParameter: 0
+    intParameter: 0
+    messageOptions: 0
+  - time: 0.5
+    functionName: TakeStamina
+    data: 
+    objectReferenceParameter: {fileID: 0}
+    floatParameter: 15
+    intParameter: 0
+    messageOptions: 0
+  - time: 0.6
+    functionName: Sfx
+    data: Roll
     objectReferenceParameter: {fileID: 0}
     floatParameter: 0
     intParameter: 0

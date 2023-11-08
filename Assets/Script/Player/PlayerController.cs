@@ -4,24 +4,27 @@ using UnityEngine;
 using UnityEngine.UI;
 using Photon.Pun;
 using Photon.Realtime;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
-public class PlayerController : MonoBehaviourPun, IPunObservable
+public class PlayerController : MonoBehaviourPunCallbacks, IPunObservable
 {
     PhotonView PV;
-    InputHandle inputHandle;
     Animator anim;
-    AnimationHandle animHandle;
     Weapons weapon;
-
-    [SerializeField] Slider healthBar;
+    PlayerStat playerStat;
+    InputHandle inputHandle;
+    AnimationHandle animHandle;
+    PlayerManager playerManager;
+    UIManager uiManager;
+    
     [SerializeField] GameObject ui;
 
     [Header("Movement System")]
     Vector3 moveAmount, smoothMoveVelocity;
     Rigidbody rb;
-    float timeSinceRollDodge;
-    public bool grounded, dodgeBack, rolling;
-    [SerializeField] float mouseSensitivity, walkSpeed, sprintSpeed, jumpForce, smoothTime;
+    [SerializeField] float timeSinceRollDodge;
+    public bool grounded, dodgeBack, rolling, sprinting;
+    [SerializeField] float mouseSensitivity, moveSpeed, walkSpeed, sprintSpeed, jumpForce, smoothTime;
 
     [Header("Attack System")]
     public bool isAttacking = false;
@@ -39,7 +42,9 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     {
         inputHandle = GetComponent<InputHandle>();
         animHandle = GetComponent<AnimationHandle>();
+        playerStat = GetComponent<PlayerStat>();
         weapon = GetComponentInChildren<Weapons>();
+        uiManager = GetComponentInChildren<UIManager>();
         anim = GetComponent<Animator>();
         rb = GetComponent<Rigidbody>();
         PV = GetComponent<PhotonView>();
@@ -51,9 +56,8 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         {
             Destroy(GetComponentInChildren<Camera>().gameObject);
             Destroy(ui);
+            Destroy(rb);
         }
-
-        
     }
 
     void Update()
@@ -61,16 +65,23 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if(!PV.IsMine)
             return;
 
-        if(PV.IsMine)
-        {
+        
+        animHandle.FallingAnimation();
+
+        if(!uiManager.isPaused)
             Look();
+
+        if(grounded && !uiManager.isPaused)
+        {
             Move();
-            Jump();
             Attack();
             Block();
-            Parried(); 
+            //Parried(); 
+            Sprint();
         }
         
+
+        timeSinceRollDodge += Time.deltaTime;
     }
 
     void FixedUpdate()
@@ -79,6 +90,10 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             return;
 
         rb.MovePosition(rb.position + transform.TransformDirection(moveAmount) * Time.fixedDeltaTime);
+
+        if(timeSinceRollDodge > 0.75f && playerStat.currentStamina > 15f && grounded)
+            RollForward();
+            DodgeBackward(); 
     }
 
     public void Look()
@@ -90,80 +105,70 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     {
         Vector3 moveDir = new Vector3(inputHandle.move.x, 0, inputHandle.move.y).normalized;
 
-        moveAmount = Vector3.SmoothDamp(moveAmount, moveDir * (inputHandle.sprint ? sprintSpeed : walkSpeed), ref smoothMoveVelocity, smoothTime);
+        moveAmount = Vector3.SmoothDamp(moveAmount, moveDir * moveSpeed, ref smoothMoveVelocity, smoothTime);
+
+        animHandle.MoveAnimation();
+    }
+
+    public void Sprint()
+    {
+        if(inputHandle.sprint && inputHandle.move.y == 1 && playerStat.currentStamina > 1.0f && !rolling && !dodgeBack) 
+        {
+            playerStat.TakeStamina(0.1f);
+            moveSpeed = sprintSpeed;
+            sprinting = true;
+            animHandle.SprintAnimation(true);
+        }
+        else
+        {
+            sprinting = false;
+            animHandle.SprintAnimation(false);
+            moveSpeed = walkSpeed;
+        }
     }
 
     public void Jump()
     {
-        timeSinceRollDodge += Time.deltaTime;
-
-        if(inputHandle.jump && inputHandle.move != Vector2.zero && !isAttacking && timeSinceRollDodge > 1.0f)
+        if(inputHandle.jump) 
         {
-            if(inputHandle.move.y == 1) 
-            {
-                rolling = true;
-                animHandle.RollforwardAnimation();
-                timeSinceRollDodge = 0f;
-                Rollforward();
-            }
-            else if(inputHandle.move.y == -1) 
-            {
-                dodgeBack = true;
-                animHandle.DodgeBackAnimation();
-                timeSinceRollDodge = 0f;
-                DodgeBackward();
-            }  
-        }
-
-        if(rolling)
-        {
-            StartCoroutine(stopRoll(0.15f));
-        }
-
-        if(dodgeBack)
-        {
-            StartCoroutine(stopDogde(0.15f));
+              
         }
     }
 
-    public void Rollforward()
-    {   
-        float rollSpeed = 15f;
-
-        rb.AddForce(transform.forward * rollSpeed, ForceMode.Acceleration);
-        
-        if(!grounded)
+    public void RollForward()
+    {
+        if(inputHandle.jump) 
         {
-            
+            if(inputHandle.move.y == 1)
+            {
+                rolling = true;
+                //playerStat.TakeStamina(15f);
+                animHandle.RollForwardAnimation();
+                timeSinceRollDodge = 0f;
+                StartCoroutine(stopRoll(0.25f));
+
+                float rollSpeed = 20f;
+                rb.AddForce(transform.forward * rollSpeed, ForceMode.Acceleration);
+            }
         }
     }
 
     public void DodgeBackward()
-    {   
-        float dodgeSpeed = 20f;
-
-        rb.AddForce(-transform.forward * dodgeSpeed, ForceMode.Acceleration);
-
-        if(!grounded)
+    {
+        if(inputHandle.jump) 
         {
-            
-        }
-    }
+            if(inputHandle.move.y == -1)
+            {
+                dodgeBack = true;
+                //playerStat.TakeStamina(5.0f);
+                animHandle.DodgeBackAnimation();
+                timeSinceRollDodge = 0f;
+                StartCoroutine(stopDogde(0.25f));
 
-    IEnumerator stopRoll(float stopTime)
-    {
-        rolling = true;
-        yield return new WaitForSeconds(stopTime);
-        rolling = false;
-        rb.velocity = Vector3.zero;
-    }
-
-    IEnumerator stopDogde(float stopTime)
-    {
-        dodgeBack = true;
-        yield return new WaitForSeconds(stopTime);
-        dodgeBack = false;
-        rb.velocity = Vector3.zero;
+                float dodgeSpeed = 20f;
+                rb.AddForce(-transform.forward * dodgeSpeed, ForceMode.Acceleration);
+            }
+        } 
     }
 
     public void SetGroundedState(bool _grounded)
@@ -175,20 +180,22 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
     {
         timeSinceAttack += Time.deltaTime;
 
-        if (inputHandle.attack && timeSinceAttack > 0.5f)
+        if (inputHandle.attack && timeSinceAttack > 0.5f && !isParried && playerStat.currentStamina > 15)
         {
             currentAttack++;
-                
-            inputHandle.move = Vector2.zero;
-                
-            if (currentAttack > 3) currentAttack = 1;
+
+            //playerStat.TakeStamina(15f);
                     
+            inputHandle.move = Vector2.zero;
+                    
+            if (currentAttack > 4) currentAttack = 1;
+                        
             //Reset Attack When Time out
             if (timeSinceAttack > 1.0f) currentAttack = 1;
 
             //Call Trigger Attack Animation
             PV.RPC("RPC_Attack", RpcTarget.AllBufferedViaServer, currentAttack);
-            
+                
             //Reset Timer
             timeSinceAttack = 0;
         }
@@ -226,17 +233,42 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
         if(isParried)
         {
             inputHandle.move = Vector2.zero;
+
             animHandle.ParriedAnimation();
-            weapon.isParried = false;
+            
+            //weapon.isParried = false;
+
+            StartCoroutine(resetBool(weapon.isParried, 1.5f));
         }
+    }
+
+    IEnumerator stopRoll(float stopTime)
+    {
+        rolling = true;
+        yield return new WaitForSeconds(stopTime);
+        rolling = false;
+        rb.velocity = Vector3.zero;
+    }
+
+    IEnumerator stopDogde(float stopTime)
+    {
+        dodgeBack = true;
+        yield return new WaitForSeconds(stopTime);
+        dodgeBack = false;
+        rb.velocity = Vector3.zero;
+    }
+
+    IEnumerator resetBool(bool BoolValue, float stopTime)
+    {
+        BoolValue = true;
+        yield return new WaitForSeconds(stopTime);
+        BoolValue = false;
     }
 
     [PunRPC]
     void RPC_Attack(int _currentAttack, PhotonMessageInfo info)
     {
         if(_currentAttack != 0) animHandle.AttackAnimation(_currentAttack);
-
-        Debug.Log(_currentAttack);
     }
 
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
@@ -247,6 +279,7 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             stream.SendNext(isParry);
             stream.SendNext(isParried);
             stream.SendNext(isBlocking);
+            stream.SendNext(timeSinceRollDodge);
         }
         else
         {
@@ -254,6 +287,7 @@ public class PlayerController : MonoBehaviourPun, IPunObservable
             isParried = (bool)stream.ReceiveNext();
             isParry = (bool)stream.ReceiveNext();
             isBlocking = (bool)stream.ReceiveNext();
+            timeSinceRollDodge = (float)stream.ReceiveNext();
         }
     }
 }

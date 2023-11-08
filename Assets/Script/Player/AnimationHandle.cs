@@ -10,15 +10,17 @@ public class AnimationHandle : MonoBehaviourPun
     Animator anim;
     InputHandle inputHandle;
     PlayerController playerController;
-    PlayerGroundCheck groundCheck;
+    UIManager uiManager;
+    SoundFx sfx;
 
     void Awake()
     {
         PV = GetComponent<PhotonView>();
         anim = GetComponent<Animator>();
         inputHandle = GetComponent<InputHandle>();
-        groundCheck = GetComponentInChildren<PlayerGroundCheck>();
         playerController = GetComponent<PlayerController>();
+        uiManager = GetComponentInChildren<UIManager>();
+        sfx = GetComponentInChildren<SoundFx>();
     }
 
     void Start()
@@ -29,43 +31,39 @@ public class AnimationHandle : MonoBehaviourPun
     void Update()
     {
         if(!PV.IsMine)
-        {
             return;
-        }
 
 
         if(PV.IsMine)
-        {
             anim.SetBool("isBlock", playerController.isBlocking);
-        } 
+            anim.SetBool("Sitting", uiManager.isPaused);
   
     }   
 
-    void FixedUpdate()
+    public void FallingAnimation()
     {
-        if(PV.IsMine)
-            MoveAnimation();
+        if(!playerController.grounded)
+        {
+            anim.SetBool("Falling", true);
+        }
+        else
+        {
+            anim.SetBool("Falling", false);
+        }
     }
 
     public void MoveAnimation()
     {
-        if(!groundCheck.isJumping) 
-            anim.SetBool("isDodgeBack", false);
-            anim.SetBool("isRolling", false); 
-
-        if(inputHandle.sprint && inputHandle.move.y == 1)
-        {
-            anim.SetBool("isSprint", true);
-        }
-        else
-        {
-            anim.SetBool("isSprint", false);
-            anim.SetFloat("Horizontal", inputHandle.move.x, 0.1f, Time.deltaTime);
-            anim.SetFloat("Vertical", inputHandle.move.y, 0.1f, Time.deltaTime);
-        }
+        anim.SetFloat("Horizontal", inputHandle.move.x, 0.1f, Time.deltaTime);
+        anim.SetFloat("Vertical", inputHandle.move.y, 0.1f, Time.deltaTime);
     }
 
-    public void RollforwardAnimation()
+    public void SprintAnimation(bool sprinting)
+    {
+        anim.SetBool("isSprint", sprinting);
+    }
+
+    public void RollForwardAnimation()
     {
         anim.SetTrigger("isRolling"); 
     }
@@ -85,15 +83,20 @@ public class AnimationHandle : MonoBehaviourPun
         if(_currentAttack != 0) anim.SetTrigger("Attack" + _currentAttack);
     }
 
+    public void ParryAnimation()
+    {
+        anim.SetTrigger("Parry");
+    }
+
     public void HurtAnimation()
     {
         anim.SetTrigger("Hurt");
         inputHandle.move = Vector2.zero;
     }
 
-    public void BlockReactAnimation()
+    public void BlockReactAnimation(string animName)
     {
-        anim.SetTrigger("isBlocked");
+        anim.Play(animName);
     }
 
     public void StartAttack()
@@ -105,4 +108,38 @@ public class AnimationHandle : MonoBehaviourPun
     {
         playerController.isAttacking = false;
     } 
+
+    public void Sfx(string sfxName)
+    {
+        if(sfxName == "Slash") 
+        {
+            sfx.footStepSfx.Stop();
+            sfx.slashSfx.Play();
+        }
+        else if(sfxName == "Roll") 
+        {
+            sfx.footStepSfx.Stop();
+            sfx.rollingSfx.Play();
+        }
+        else if(sfxName == "FootStep") 
+        {
+            if(inputHandle.move != Vector2.zero)
+            {
+                sfx.footStepSfx.Play();
+            }
+            else
+            {
+                sfx.footStepSfx.Stop();
+            }
+        }
+        else if(sfxName == "Land") 
+        {
+            sfx.footStepSfx.Stop();
+            sfx.landSfx.Play();
+        }
+        else
+        {
+            //sfx.footStepSfx.Stop();
+        }
+    }
 }
